@@ -7,6 +7,11 @@ import (
 
 func main() {
 
+	{
+		//d := New(2)
+		//d.Debounce(SayHello, 1)
+	}
+
 	dur := time.Duration(5) * time.Second
 
 	in := make(chan int) // there's input data stream
@@ -43,8 +48,45 @@ func main() {
 	}
 }
 
+type Debounce struct {
+	t        *time.Ticker
+	debounce time.Duration
+	past     int
+	first    bool
+}
+
+func New(debounce int) *Debounce {
+	return &Debounce{
+		t:        time.NewTicker(1 * time.Second),
+		debounce: time.Duration(debounce),
+		past:     0,
+		first:    true,
+	}
+}
+
+func (d *Debounce) debounce0(f func(int), i int) {
+
+	go func() {
+		for {
+			select {
+			case <-d.t.C:
+				d.past++
+			}
+		}
+	}()
+
+	now := time.Now()
+	p := now.Add(-time.Duration(d.past))
+	if now.Sub(p) >= d.debounce || d.first {
+		d.past = 0
+		d.first = false
+		f(i)
+	}
+
+}
+
 // debounce
-func debounce(in chan int, interval time.Duration) chan int {
+func debounce1(in chan int, interval time.Duration) chan int {
 	out := make(chan int)
 	now := time.Now()
 	count := 0
