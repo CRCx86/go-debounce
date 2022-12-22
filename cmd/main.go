@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"time"
 )
@@ -15,8 +16,8 @@ func main() {
 	dur := time.Duration(5) * time.Second
 
 	in := make(chan int) // there's input data stream
-	ex := make(chan bool)
-	out := debounce3(in, dur, ex) // there's out data set
+	ctx, c := context.WithCancel(context.Background())
+	out := debounce3(in, dur, ctx) // there's out data set
 
 	// Per second tact's imitation
 	go func(in chan int) {
@@ -39,8 +40,7 @@ func main() {
 			time.Sleep(1 * time.Second)
 		}
 		close(in)
-		ex <- true
-		close(ex)
+		c()
 	}(in)
 
 	for i := range out { // data out
@@ -140,16 +140,15 @@ func debounce2(in chan int, dur time.Duration, ex chan bool) chan int {
 	return out
 }
 
-func debounce3(in chan int, dur time.Duration, ex chan bool) chan int {
+func debounce3(in chan int, dur time.Duration, ctx context.Context) chan int {
 
 	out := make(chan int)
 	go func(in chan int, out chan int, dur time.Duration) {
 
 		loop := true
-		exited := false
 		timed := false
 
-		var swap int
+		swap := 0
 		t := time.NewTimer(dur)
 		for loop {
 			select {
@@ -159,15 +158,15 @@ func debounce3(in chan int, dur time.Duration, ex chan bool) chan int {
 					t.Reset(dur)
 					swap = i
 				}
-			case <-ex:
-				exited = true
+			case <-ctx.Done():
+				loop = false
+				if timed {
+					out <- swap
+				}
 			case <-t.C:
 				out <- swap
 				swap = 0
 				timed = false
-				if exited {
-					loop = false
-				}
 			}
 		}
 
