@@ -145,12 +145,11 @@ func debounce3(in chan int, dur time.Duration, ctx context.Context) chan int {
 	out := make(chan int)
 	go func(in chan int, out chan int, dur time.Duration) {
 
-		loop := true
 		timed := false
-
 		swap := 0
 		t := time.NewTimer(dur)
-		for loop {
+
+		for {
 			select {
 			case i := <-in:
 				if !timed {
@@ -159,18 +158,17 @@ func debounce3(in chan int, dur time.Duration, ctx context.Context) chan int {
 					swap = i
 				}
 			case <-ctx.Done():
-				loop = false
 				if timed {
 					out <- swap
 				}
+				close(out)
+				return
 			case <-t.C:
 				out <- swap
 				swap = 0
 				timed = false
 			}
 		}
-
-		close(out)
 
 	}(in, out, dur)
 
